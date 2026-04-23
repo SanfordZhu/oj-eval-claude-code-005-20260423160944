@@ -140,7 +140,7 @@ def main():
             print(f"Error: Failed to read code file: {e}")
             exit(1)
 
-        result = client.submit_code(args.problem_id, args.language, code_text)
+        result = client.submit_git(args.problem_id, code_text)
 
     elif args.command == "status":
         result = client.get_submission_detail(args.submission_id)
