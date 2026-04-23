@@ -79,67 +79,79 @@ bool QoiEncode(uint32_t width, uint32_t height, uint8_t channels, uint8_t colors
         // Check for run-length encoding (QOI_OP_RUN)
         if (r == pre_r && g == pre_g && b == pre_b && a == pre_a) {
             run++;
-            if (run == 62 || i == px_num - 1) {
-                QoiWriteU8(QOI_OP_RUN_TAG | (run - 1));
+            if (run >= 62 || i == px_num - 1) {
+                QoiWriteU8(QOI_OP_RUN_TAG | ((run - 1) & 0x3f));
                 run = 0;
             }
-            continue;
-        } else if (run > 0) {
-            QoiWriteU8(QOI_OP_RUN_TAG | (run - 1));
-            run = 0;
-        }
-
-        // Check for index encoding (QOI_OP_INDEX)
-        int index = QoiColorHash(r, g, b, a);
-        if (history[index][0] == r && history[index][1] == g &&
-            history[index][2] == b && history[index][3] == a) {
-            QoiWriteU8(QOI_OP_INDEX_TAG | index);
         } else {
-            // Store in history
-            history[index][0] = r;
-            history[index][1] = g;
-            history[index][2] = b;
-            history[index][3] = a;
+            if (run > 0) {
+                QoiWriteU8(QOI_OP_RUN_TAG | ((run - 1) & 0x3f));
+                run = 0;
+            }
 
-            // Check for difference encoding
-            int dr = r - pre_r;
-            int dg = g - pre_g;
-            int db = b - pre_b;
-
-            if (a == pre_a && dr >= -2 && dr <= 1 && dg >= -2 && dg <= 1 && db >= -2 && db <= 1) {
-                // QOI_OP_DIFF
-                QoiWriteU8(QOI_OP_DIFF_TAG | (((dr + 2) & 0x03) << 4) | (((dg + 2) & 0x03) << 2) | ((db + 2) & 0x03));
-            } else if (a == pre_a) {
-                // Check for luma encoding (QOI_OP_LUMA)
-                int dr_dg = dr - dg;
-                int db_dg = db - dg;
-                if (dg >= -32 && dg <= 31 && dr_dg >= -8 && dr_dg <= 7 && db_dg >= -8 && db_dg <= 7) {
-                    QoiWriteU8(QOI_OP_LUMA_TAG | ((dg + 32) & 0x3f));
-                    QoiWriteU8((((dr_dg + 8) & 0x0f) << 4) | ((db_dg + 8) & 0x0f));
-                } else {
-                    // Full RGB or RGBA
-                    if (a == pre_a) {
-                        QoiWriteU8(QOI_OP_RGB_TAG);
-                        QoiWriteU8(r);
-                        QoiWriteU8(g);
-                        QoiWriteU8(b);
-                    } else {
-                        QoiWriteU8(QOI_OP_RGBA_TAG);
-                        QoiWriteU8(r);
-                        QoiWriteU8(g);
-                        QoiWriteU8(b);
-                        QoiWriteU8(a);
-                    }
-                }
+            // Check for index encoding (QOI_OP_INDEX)
+            int index = QoiColorHash(r, g, b, a);
+            if (history[index][0] == r && history[index][1] == g &&
+                history[index][2] == b && history[index][3] == a) {
+                QoiWriteU8(QOI_OP_INDEX_TAG | index);
             } else {
-                // Alpha changed, must use RGBA
-                QoiWriteU8(QOI_OP_RGBA_TAG);
-                QoiWriteU8(r);
-                QoiWriteU8(g);
-                QoiWriteU8(b);
-                QoiWriteU8(a);
+                // Store in history
+                history[index][0] = r;
+                history[index][1] = g;
+                history[index][2] = b;
+                history[index][3] = a;
+
+                // Check for difference encoding
+                int dr = r - pre_r;
+                int dg = g - pre_g;
+                int db = b - pre_b;
+
+                if (a == pre_a && dr >= -2 && dr <= 1 && dg >= -2 && dg <= 1 && db >= -2 && db <= 1) {
+                    // QOI_OP_DIFF
+                    QoiWriteU8(QOI_OP_DIFF_TAG | (((dr + 2) & 0x03) << 4) | (((dg + 2) & 0x03) << 2) | ((db + 2) & 0x03));
+                } else if (a == pre_a) {
+                    // Check for luma encoding (QOI_OP_LUMA)
+                    int dr_dg = dr - dg;
+                    int db_dg = db - dg;
+                    if (dg >= -32 && dg <= 31 && dr_dg >= -8 && dr_dg <= 7 && db_dg >= -8 && db_dg <= 7) {
+                        QoiWriteU8(QOI_OP_LUMA_TAG | ((dg + 32) & 0x3f));
+                        QoiWriteU8((((dr_dg + 8) & 0x0f) << 4) | ((db_dg + 8) & 0x0f));
+                    } else {
+                        // Full RGB or RGBA
+                        if (a == pre_a) {
+                            QoiWriteU8(QOI_OP_RGB_TAG);
+                            QoiWriteU8(r);
+                            QoiWriteU8(g);
+                            QoiWriteU8(b);
+                        } else {
+                            QoiWriteU8(QOI_OP_RGBA_TAG);
+                            QoiWriteU8(r);
+                            QoiWriteU8(g);
+                            QoiWriteU8(b);
+                            QoiWriteU8(a);
+                        }
+                    }
+                } else {
+                    // Alpha changed, must use RGBA
+                    QoiWriteU8(QOI_OP_RGBA_TAG);
+                    QoiWriteU8(r);
+                    QoiWriteU8(g);
+                    QoiWriteU8(b);
+                    QoiWriteU8(a);
+                }
             }
         }
+
+        // Update previous pixel
+        pre_r = r;
+        pre_g = g;
+        pre_b = b;
+        pre_a = a;
+    }
+
+    // Flush any pending run
+    if (run > 0) {
+        QoiWriteU8(QOI_OP_RUN_TAG | ((run - 1) & 0x3f));
     }
 
     // qoi-padding part
