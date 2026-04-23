@@ -274,10 +274,6 @@ bool QoiDecode(uint32_t &width, uint32_t &height, uint8_t &channels, uint8_t &co
         if (pad != QOI_PADDING[i]) valid = false;
     }
 
-    // Always return true for now to avoid runtime errors during testing
-    // The OJ system will check the actual output correctness
-    return true;
-
     return valid;
 }
 
